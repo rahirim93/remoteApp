@@ -1,13 +1,7 @@
 package com.example.remoteapp;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.app.NotificationCompat;
-import androidx.core.app.NotificationManagerCompat;
 
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
@@ -17,17 +11,13 @@ import android.util.Log;
 import android.view.View;
 import android.widget.CompoundButton;
 import android.widget.TextView;
-import android.widget.Toast;
 import android.widget.ToggleButton;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.time.chrono.ThaiBuddhistEra;
 import java.util.Calendar;
 import java.util.UUID;
-
-import static android.widget.Toast.LENGTH_SHORT;
 
 public class BluetoothInfoAcvivity extends AppCompatActivity {
 
@@ -40,8 +30,11 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
     TextView textViewName;
     TextView textViewAddress;
     TextView textViewStatus;
-    TextView textViewMessage;
-    TextView textViewSpeedHeating;
+    TextView textViewTempFirst;
+    TextView textViewTempSecond;
+    TextView textViewSpeedHeatingFirst;
+    TextView textViewSpeedHeatingSecond;
+    TextView textViewStatusRelay;
 
     ToggleButton toggleButton;
 
@@ -66,8 +59,11 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
         textViewName = findViewById(R.id.textViewName);
         textViewAddress = findViewById(R.id.textViewAdress);
         textViewStatus = findViewById(R.id.textViewStatus);
-        textViewMessage = findViewById(R.id.textViewMessage);
-        textViewSpeedHeating = findViewById(R.id.textViewSpeedHeating);
+        textViewTempFirst = findViewById(R.id.textViewTempFirst);
+        textViewTempSecond = findViewById(R.id.textViewTempSecond);
+        textViewSpeedHeatingFirst = findViewById(R.id.textViewSpeedHeatingFirst);
+        textViewSpeedHeatingSecond = findViewById(R.id.textViewSpeedHeatingSecond);
+        textViewStatusRelay = findViewById(R.id.textViewStatusRelay);
 
         toggleButton = findViewById(R.id.toggleButton);
         toggleButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -123,20 +119,24 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
     private class ConnectThread extends Thread {
         private final BluetoothSocket mmSocket;
         private final BluetoothDevice mmDevice;
-        private final UUID MY_UUID =UUID.fromString ("00001101-0000-1000-8000-00805F9B34FB");
+        private final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
         BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         InputStream inputStream;
         OutputStream outputStream;
 
         // Переменные для расчета скорости нагрева
-        long timeFirstPoint;
-        double tempFirstPoint;
-        double timeDifference;
-        double tempDifference;
-        double speedOfHeating;
-        int counter = 0;
-        String stringSpeedHeating;
-        boolean flag = true;
+        long timeFirstPoint;                        // Время первого замера температуры
+        double tempFirstPointFirstSensor;           // Температура первого замера первого датчика
+        double tempFirstPointSecondSensor;          // Температура первого замера второго датчика
+        double timeDifference;                      // Разница времени между первым и вторым замером
+        double tempDifferenceFirstSensor;           // Разница температуры между первым и вторым замером первого датчика
+        double tempDifferenceSecondSensor;          // Разница температуры между первым и вторым замером второго датчика
+        double speedOfHeatingFirstSensor;           // Скорость нагрева первого датчика
+        double speedOfHeatingSecondSensor;          // Скорость нагрева второго датчика
+        int counter = 0;                            //
+        String stringSpeedHeatingFirstSensor;       // String cкорости нагрева первого датчика
+        String stringSpeedHeatingSecondSensor;      // String cкорости нагрева второго датчика
+        boolean flag = true;                        // Время первого замера температуры
 
         public ConnectThread(String bluetoothAddress) {
             // Use a temporary object that is later assigned to mmSocket
@@ -198,6 +198,8 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
                 e.printStackTrace();
             }
 
+            sendMsg("0");   // Включение чайника при запуске приложения
+
             StringBuilder stringBuilder = new StringBuilder();
 
             inputStream = tempInputStream;
@@ -206,70 +208,92 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
             byte[] buffer = new byte[256];  // buffer store for the stream
             int bytes; // bytes returned from read()
 
-            while (true){
+            while (true) {
                 try {
-                    bytes = inputStream.read(buffer);
-                    String stringIncom = new String(buffer, 0, bytes);
-                    stringBuilder.append(stringIncom);
-                    int endOfLineIndex = stringBuilder.indexOf("\r\n");
-                    if (endOfLineIndex > 0) {
-                        String sbprint = stringBuilder.substring(0, endOfLineIndex);
-                        stringBuilder.delete(0, stringBuilder.length());
+                    bytes = inputStream.read(buffer);                                 // Запись входещего потока в буфер с присвоением bytes количества байтов
+                    String stringIncom = new String(buffer, 0, bytes);           // Формирование строки на основе прочитанного массива байтов
 
-                        // Подсчет скорости нагрева
+                    stringBuilder.append(stringIncom);                                // Добавляем сформированную строку в StringBuilder
+
+                    int endOfLineIndex1 = stringBuilder.indexOf("A");                 // Находим индекс первого параметра
+                    int endOfLineIndex2 = stringBuilder.indexOf("B");                 // Находим индекс второго параметра
+                    int endOfLineIndex3 = stringBuilder.indexOf("\r\n");              // Находим конец строки, также является индексом конца последнего параметра
+
+                    // Если в строке что-то есть
+                    if (endOfLineIndex3 > 0) {
+                        String sbprint1 = stringBuilder.substring(0, endOfLineIndex1);                      // Формируем String первого параметра
+                        String sbprint2 = stringBuilder.substring(endOfLineIndex1 + 1, endOfLineIndex2);    // Формируем String второго параметра
+                        String sbprint3 = stringBuilder.substring(endOfLineIndex2 + 1, endOfLineIndex3);    // Формируем String третьего параметра
+                        stringBuilder.delete(0, stringBuilder.length());                                    // Очищаем StringBuilder
+
+                        //Подсчет скорости нагрева (пока для обоих датчиков).
                         if (counter == 0) {
                             timeFirstPoint = Calendar.getInstance().getTimeInMillis();
-                            tempFirstPoint = Double.parseDouble(sbprint);
+                            tempFirstPointFirstSensor = Double.parseDouble(sbprint1);
+                            tempFirstPointSecondSensor = Double.parseDouble(sbprint2);
                             counter++;
                         } else if (counter == 1) {
-                            // Разница времени для подсчета скорости нагрева. Деление на 1000 для приведения к секундам
-                            timeDifference = ((double) (Calendar.getInstance().getTimeInMillis() - timeFirstPoint)) / 1000;
-                            tempDifference = Double.parseDouble(sbprint) - tempFirstPoint;
-                            speedOfHeating = tempDifference / timeDifference;
-                            stringSpeedHeating = String.format("%.2f", speedOfHeating);
-                            timeFirstPoint = Calendar.getInstance().getTimeInMillis();
-                            tempFirstPoint = Double.parseDouble(sbprint);
-                            System.out.println(stringSpeedHeating + "\t" + timeDifference + "\t" + tempDifference);
+                            timeDifference = ((double) (Calendar.getInstance().getTimeInMillis() - timeFirstPoint)) / 1000; // Разница времени для подсчета скорости нагрева
+
+                            tempDifferenceFirstSensor = Double.parseDouble(sbprint1) - tempFirstPointFirstSensor;           // Разница температуры первого датчика
+                            tempDifferenceSecondSensor = Double.parseDouble(sbprint2) - tempFirstPointSecondSensor;         // Разница температуры второго датчика
+
+                            speedOfHeatingFirstSensor = tempDifferenceFirstSensor / timeDifference;                         // Скорость нагрева первого датчика
+                            speedOfHeatingSecondSensor = tempDifferenceSecondSensor / timeDifference;                       // Скорость нагрева второго датчика
+
+                            stringSpeedHeatingFirstSensor = String.format("%.2f", speedOfHeatingFirstSensor);               // String скорости нагрева первого датчика
+                            stringSpeedHeatingSecondSensor = String.format("%.2f", speedOfHeatingSecondSensor);             // String скорости нагрева второго датчика
+
+                            timeFirstPoint = Calendar.getInstance().getTimeInMillis();                                      // Текущее время для следующего расчета
+                            tempFirstPointFirstSensor = Double.parseDouble(sbprint1);                                       // Температура первого датчика для следующего замера
+                            tempFirstPointSecondSensor = Double.parseDouble(sbprint2);                                      // Температура второго датчика для следующего замера
                         }
+
+                        Log.i("rah", "Первая температура: " + sbprint1 + " Вторая температура: " + sbprint2 + " Состояния: " + sbprint3);
 
                         // Вывод информации в TextView
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                textViewMessage.setText("Температура: " + sbprint);
-                                textViewSpeedHeating.setText("Скорость нагрева: " + stringSpeedHeating + " град/сек");
 
-                                // Вывод уведомления при достижении температуры отключения
-                                if (Double.parseDouble(sbprint) > 70 & flag) {
-                                    flag = false;
-                                    CharSequence name = "Simple Notification";
-                                    String description = "Include all the simple notification";
-                                    int importance = NotificationManager.IMPORTANCE_DEFAULT;
-
-                                    NotificationChannel notificationChannel = new NotificationChannel("CHANNEL_ID", name, importance);
-                                    notificationChannel.setDescription(description);
-
-
-                                    NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-                                    notificationManager.createNotificationChannel(notificationChannel);
-
-                                    NotificationCompat.Builder builder = new NotificationCompat.Builder(BluetoothInfoAcvivity.this, "CHANNEL_ID");
-                                    builder.setContentText("Чайник вскипятился")
-                                            .setSmallIcon(R.mipmap.ic_launcher)
-                                            .setTicker("Ticker text")
-                                            //.setDefaults(Notification.DEFAULT_VIBRATE)
-                                            .setPriority(NotificationCompat.PRIORITY_DEFAULT);
-
-                                    NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(BluetoothInfoAcvivity.this);
-                                    notificationManagerCompat.notify(1, builder.build());
+                                textViewTempFirst.setText("Температура (датчик 1): " + sbprint1);
+                                textViewTempSecond.setText("Температура (датчик 2): " + sbprint2);
+                                textViewSpeedHeatingFirst.setText("Скорость нагрева (датчик 1): " + stringSpeedHeatingFirstSensor + " град/сек");
+                                textViewSpeedHeatingSecond.setText("Скорость нагрева (датчик 2): " + stringSpeedHeatingSecondSensor + " град/сек");
+                                if (Integer.parseInt(sbprint3) == 1) {
+                                    textViewStatusRelay.setText("Состояние реле: выключено");
+                                } else {
+                                    textViewStatusRelay.setText("Состояние реле: включено");
                                 }
-                                if (Double.parseDouble(sbprint) < 70) {
-                                    flag = true;
-                                }
+                                //Вывод уведомления при достижении температуры отключения. Пока отключено. Нужно выяснить обязательно ли его прописывать на основном потоке
+//                                if (Double.parseDouble(sbprint) > 70 & flag) {
+//                                    flag = false;
+//                                    CharSequence name = "Simple Notification";
+//                                    String description = "Include all the simple notification";
+//                                    int importance = NotificationManager.IMPORTANCE_DEFAULT;
+//
+//                                    NotificationChannel notificationChannel = new NotificationChannel("CHANNEL_ID", name, importance);
+//                                    notificationChannel.setDescription(description);
+//
+//
+//                                    NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+//                                    notificationManager.createNotificationChannel(notificationChannel);
+//
+//                                    NotificationCompat.Builder builder = new NotificationCompat.Builder(BluetoothInfoAcvivity.this, "CHANNEL_ID");
+//                                    builder.setContentText("Чайник вскипятился")
+//                                            .setSmallIcon(R.mipmap.ic_launcher)
+//                                            .setTicker("Ticker text")
+//                                            //.setDefaults(Notification.DEFAULT_VIBRATE)
+//                                            .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+//
+//                                    NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(BluetoothInfoAcvivity.this);
+//                                    notificationManagerCompat.notify(1, builder.build());
+//                                }
+//                                if (Double.parseDouble(sbprint) < 70) {
+//                                    flag = true;
+//                                }
                             }
                         });
-
-
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -299,7 +323,7 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        if (!(myConnect == null)){
+        if (!(myConnect == null)) {
             try {
                 myConnect.cancel();
             } catch (Exception e) {
