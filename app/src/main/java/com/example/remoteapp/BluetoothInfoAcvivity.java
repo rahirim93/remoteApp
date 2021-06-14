@@ -1,14 +1,21 @@
 package com.example.remoteapp;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.TextView;
 import android.widget.ToggleButton;
@@ -40,6 +47,15 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
 
     ConnectThread myConnect;
 
+    CheckBox checkBox;
+
+    boolean flag = false;                        // Флаг для
+
+    // Переменные для сохранения настроек в SharedPreferences
+    public static final String APP_PREFERENCES = "mysettings";
+    public static final String APP_PREFERENCES_AUTO_ON_OFF = "";
+    private SharedPreferences mSettings;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -65,25 +81,46 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
         textViewSpeedHeatingSecond = findViewById(R.id.textViewSpeedHeatingSecond);
         textViewStatusRelay = findViewById(R.id.textViewStatusRelay);
 
+        checkBox = findViewById(R.id.checkBox);
+
+        mSettings = getSharedPreferences(APP_PREFERENCES, Context.MODE_PRIVATE);
+
         toggleButton = findViewById(R.id.toggleButton);
-        toggleButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                if (isChecked) {
-                    try {
-                        myConnect.sendMsg("0");
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                } else {
-                    try {
-                        myConnect.sendMsg("1");
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
+        toggleButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                try {
+                    myConnect.sendMsg("0");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            } else {
+                try {
+                    myConnect.sendMsg("1");
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
             }
         });
+
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        SharedPreferences.Editor editor = mSettings.edit();
+        editor.putBoolean(APP_PREFERENCES_AUTO_ON_OFF, checkBox.isChecked());
+        editor.apply();
+
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (mSettings.contains(APP_PREFERENCES_AUTO_ON_OFF)) {
+            checkBox.setChecked(mSettings.getBoolean(APP_PREFERENCES_AUTO_ON_OFF, true));
+        }
 
     }
 
@@ -136,7 +173,7 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
         int counter = 0;                            //
         String stringSpeedHeatingFirstSensor;       // String cкорости нагрева первого датчика
         String stringSpeedHeatingSecondSensor;      // String cкорости нагрева второго датчика
-        boolean flag = true;                        // Время первого замера температуры
+
 
         public ConnectThread(String bluetoothAddress) {
             // Use a temporary object that is later assigned to mmSocket
@@ -198,7 +235,16 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
                 e.printStackTrace();
             }
 
-            sendMsg("0");   // Включение чайника при запуске приложения
+            if (checkBox.isChecked()) {
+                sendMsg("0");   // Включение чайника при запуске приложения
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        toggleButton.setChecked(true);
+                    }
+                });
+            }
+
 
             StringBuilder stringBuilder = new StringBuilder();
 
@@ -208,7 +254,7 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
             byte[] buffer = new byte[256];  // buffer store for the stream
             int bytes; // bytes returned from read()
 
-            while (true) {
+            while (mmSocket.isConnected()) {
                 try {
                     bytes = inputStream.read(buffer);                                 // Запись входещего потока в буфер с присвоением bytes количества байтов
                     String stringIncom = new String(buffer, 0, bytes);           // Формирование строки на основе прочитанного массива байтов
@@ -265,33 +311,31 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
                                 } else {
                                     textViewStatusRelay.setText("Состояние реле: включено");
                                 }
-                                //Вывод уведомления при достижении температуры отключения. Пока отключено. Нужно выяснить обязательно ли его прописывать на основном потоке
-//                                if (Double.parseDouble(sbprint) > 70 & flag) {
-//                                    flag = false;
-//                                    CharSequence name = "Simple Notification";
-//                                    String description = "Include all the simple notification";
-//                                    int importance = NotificationManager.IMPORTANCE_DEFAULT;
-//
-//                                    NotificationChannel notificationChannel = new NotificationChannel("CHANNEL_ID", name, importance);
-//                                    notificationChannel.setDescription(description);
-//
-//
-//                                    NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-//                                    notificationManager.createNotificationChannel(notificationChannel);
-//
-//                                    NotificationCompat.Builder builder = new NotificationCompat.Builder(BluetoothInfoAcvivity.this, "CHANNEL_ID");
-//                                    builder.setContentText("Чайник вскипятился")
-//                                            .setSmallIcon(R.mipmap.ic_launcher)
-//                                            .setTicker("Ticker text")
-//                                            //.setDefaults(Notification.DEFAULT_VIBRATE)
-//                                            .setPriority(NotificationCompat.PRIORITY_DEFAULT);
-//
-//                                    NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(BluetoothInfoAcvivity.this);
-//                                    notificationManagerCompat.notify(1, builder.build());
-//                                }
-//                                if (Double.parseDouble(sbprint) < 70) {
-//                                    flag = true;
-//                                }
+
+                                // Отправка уведомления при закипании чайника
+                                if (Integer.parseInt(sbprint3) == 1 & Double.parseDouble(sbprint1) > 98.0 & flag) {
+                                    flag = false;
+                                    CharSequence name = "Simple Notification";
+                                    String description = "Include all the simple notification";
+                                    int importance = NotificationManager.IMPORTANCE_DEFAULT;
+
+                                    NotificationChannel notificationChannel = new NotificationChannel("CHANNEL_ID", name, importance);
+                                    notificationChannel.setDescription(description);
+
+
+                                    NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                                    notificationManager.createNotificationChannel(notificationChannel);
+
+                                    NotificationCompat.Builder builder = new NotificationCompat.Builder(BluetoothInfoAcvivity.this, "CHANNEL_ID");
+                                    builder.setContentText("Чайник вскипятился")
+                                            .setSmallIcon(R.mipmap.ic_launcher)
+                                            .setTicker("Ticker text")
+                                            //.setDefaults(Notification.DEFAULT_VIBRATE)
+                                            .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+
+                                    NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(BluetoothInfoAcvivity.this);
+                                    notificationManagerCompat.notify(1, builder.build());
+                                }
                             }
                         });
                     }
@@ -309,11 +353,14 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+            flag = true;
         }
 
         // Closes the client socket and causes the thread to finish.
         public void cancel() {
             try {
+                inputStream.close();
+                outputStream.close();
                 mmSocket.close();
             } catch (IOException e) {
 
