@@ -7,6 +7,18 @@
     tools:context=".BluetoothInfoAcvivity">
 
     <TextView
+        android:id="@+id/textViewMaxSpeedHeating"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="10dp"
+        android:text="TextView"
+        android:textColor="@color/white"
+        android:textSize="16sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/textViewStatusRelay" />
+
+    <TextView
         android:id="@+id/textViewStatusRelay"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -129,6 +141,6 @@
         android:layout_marginTop="10dp"
         android:text="Автовключение"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textViewStatusRelay" />
+        app:layout_constraintTop_toBottomOf="@+id/textViewMaxSpeedHeating" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

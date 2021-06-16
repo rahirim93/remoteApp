@@ -42,6 +42,7 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
     TextView textViewSpeedHeatingFirst;
     TextView textViewSpeedHeatingSecond;
     TextView textViewStatusRelay;
+    TextView textViewMaxSpeedHeating;
 
     ToggleButton toggleButton;
 
@@ -55,6 +56,9 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
     public static final String APP_PREFERENCES = "mysettings";
     public static final String APP_PREFERENCES_AUTO_ON_OFF = "";
     private SharedPreferences mSettings;
+
+    // Переменная для хранения максимальной скорости нагрева
+    double maxSpeedHeating = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,6 +84,8 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
         textViewSpeedHeatingFirst = findViewById(R.id.textViewSpeedHeatingFirst);
         textViewSpeedHeatingSecond = findViewById(R.id.textViewSpeedHeatingSecond);
         textViewStatusRelay = findViewById(R.id.textViewStatusRelay);
+        textViewMaxSpeedHeating = findViewById(R.id.textViewMaxSpeedHeating);
+
 
         checkBox = findViewById(R.id.checkBox);
 
@@ -293,6 +299,8 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
                             timeFirstPoint = Calendar.getInstance().getTimeInMillis();                                      // Текущее время для следующего расчета
                             tempFirstPointFirstSensor = Double.parseDouble(sbprint1);                                       // Температура первого датчика для следующего замера
                             tempFirstPointSecondSensor = Double.parseDouble(sbprint2);                                      // Температура второго датчика для следующего замера
+
+                            if (speedOfHeatingFirstSensor > maxSpeedHeating) maxSpeedHeating = speedOfHeatingFirstSensor;
                         }
 
                         Log.i("rah", "Первая температура: " + sbprint1 + " Вторая температура: " + sbprint2 + " Состояния: " + sbprint3);
@@ -311,6 +319,7 @@ public class BluetoothInfoAcvivity extends AppCompatActivity {
                                 } else {
                                     textViewStatusRelay.setText("Состояние реле: включено");
                                 }
+                                textViewMaxSpeedHeating.setText("Макс. скорость нагрева: " + maxSpeedHeating);
 
                                 // Отправка уведомления при закипании чайника
                                 if (Integer.parseInt(sbprint3) == 1 & Double.parseDouble(sbprint1) > 98.0 & flag) {
